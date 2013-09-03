@@ -3,10 +3,22 @@ using System.Collections.Generic;
 
 public class GameManager : Singleton<GameManager>
 {
+	public struct GameState
+	{
+		public bool title;
+		public bool player1InsertCoin;
+		public bool player2InsertCoin;
+		public bool player1Play;
+		public bool player2Play;
+		public bool gameOver;
+		public bool demo;
+	}
+	
 	private static int _nextId = 1;
 	
 	public int maxPlayers = 4;
 	
+	public Color playerColors;
 	public GameObject playerPrefab;
 	public GameObject aiPrefab;
 	public GameObject terrainPrefab;
@@ -19,7 +31,7 @@ public class GameManager : Singleton<GameManager>
 	
 	
 	private List<IObjectManager> _objects;
-	private GameObject[] _players;
+	private PlayerManager[] _players;
 	private int _localPlayer;
 	//private int _localPlayer;
 	private BulletManager[] _bullets;
@@ -28,8 +40,100 @@ public class GameManager : Singleton<GameManager>
 	private Vector3[] _spawnPoints;
 	private InputSetupData _player1Keys;
 	private InputSetupData _player2Keys;
+	private GameState _state;
+	private GUIManager _gui;
+	
+	protected override void Awake()
+	{
+		base.Awake();
+		Object.DontDestroyOnLoad(gameObject);
+		_state = new GameState();
+		_state.title = true;
+		_state.player1InsertCoin = true;
+		_state.player2InsertCoin = true;
+		_state.player1Play = false;
+		_state.player2Play = false;
+		_state.gameOver = false;
+		_state.demo = false;
+	}
 	
 	private void Start()
+	{
+		_gui = gameObject.GetComponent<GUIManager>();
+	}
+	
+	private void Update()
+	{
+		if(_state.title)
+		{ 
+			if(!Application.loadedLevelName.Equals("title"))
+				Application.LoadLevel("title");
+			else
+			{
+				
+			}
+		}
+		TimedEventManager.IncrementTimers(Time.deltaTime);
+		
+		//check for player one movement
+		/*Vector3 moveDirection = Vector3.zero;
+		if(Input.GetKey(_player1Keys.up))
+			moveDirection.y+=1;
+		if(Input.GetKey(_player1Keys.down))
+			moveDirection.y-=1;
+		if(Input.GetKey(_player1Keys.left))
+			moveDirection.x-=1;
+		if(Input.GetKey(_player1Keys.right))
+			moveDirection.x+=1;
+		
+		//normalize if two keys hit
+		if(moveDirection.x != 0 && moveDirection.y != 0)
+			moveDirection = moveDirection.normalized;
+		
+		if(moveDirection != Vector3.zero)
+			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Move(moveDirection, Time.deltaTime);*/
+	}
+	
+	private void FixedUpdate()
+	{
+		/*if(Input.GetKey(_player1Keys.button6))
+			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Jump();
+		
+		if(Input.GetKey(_player1Keys.button5))
+			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Thrust();
+		
+		if(Input.GetKeyUp(_player1Keys.button5))
+			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.EndThrust();
+		
+		if(Input.GetKeyDown(_player1Keys.button4))
+		{
+			Vector3 mousePos = Input.mousePosition;
+			Plane xy = new Plane(-Vector3.forward, Vector3.zero);
+			Ray ray = Camera.main.ScreenPointToRay(mousePos);
+			float dist;
+			
+			xy.Raycast(ray, out dist);
+			Vector3 mouseWorld = ray.GetPoint(dist);
+			
+			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Fire(mouseWorld);
+		}*/
+	}
+	
+	private void LateUpdate()
+	{
+		/*_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.StepTimers(Time.deltaTime);
+		//do respawn after one second
+		while(_toRespawn.Count > 0 &&
+				Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
+			_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);*/
+	}
+	
+	private void StartTitle()
+	{
+		
+	}
+	
+	private void StartGame()
 	{
 		_objects = new List<IObjectManager>();
 		_players = new GameObject[maxPlayers];
@@ -74,101 +178,24 @@ public class GameManager : Singleton<GameManager>
 		
 		_player1Keys = new InputSetupData(1);
 		_player2Keys = new InputSetupData(2);
-		
 	}
 	
-	private void Update()
+	private void CreatePlayers()
 	{
-		//check for player one movement
-		Vector3 moveDirection = Vector3.zero;
-		if(Input.GetKey(_player1Keys.up))
-			moveDirection.y+=1;
-		if(Input.GetKey(_player1Keys.down))
-			moveDirection.y-=1;
-		if(Input.GetKey(_player1Keys.left))
-			moveDirection.x-=1;
-		if(Input.GetKey(_player1Keys.right))
-			moveDirection.x+=1;
 		
-		//normalize if two keys hit
-		if(moveDirection.x != 0 && moveDirection.y != 0)
-			moveDirection = moveDirection.normalized;
-		
-		if(moveDirection != Vector3.zero)
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Move(moveDirection, Time.deltaTime);
-	}
-	
-	private void FixedUpdate()
-	{
-		if(Input.GetKey(_player1Keys.button6))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Jump();
-		
-		if(Input.GetKey(_player1Keys.button5))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Thrust();
-		
-		if(Input.GetKeyUp(_player1Keys.button5))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.EndThrust();
-		
-		if(Input.GetKeyDown(_player1Keys.button4))
+		for(int i=0; i < maxPlayers; ++i)
 		{
-			Vector3 mousePos = Input.mousePosition;
-			Plane xy = new Plane(-Vector3.forward, Vector3.zero);
-			Ray ray = Camera.main.ScreenPointToRay(mousePos);
-			float dist;
+			if(i <= 1)
+				_players[i] = new PlayerManager(playerPrefab, "some name", _nextId++);
+			else
+				_players[i] = new PlayerManager(aiPrefab, "some name", _nextId++);
 			
-			xy.Raycast(ray, out dist);
-			Vector3 mouseWorld = ray.GetPoint(dist);
-			
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Fire(mouseWorld);
+			_players[i] = (GameObject)GameObject.Instantiate(aiPrefab, _spawnPoints[Random.Range(0,_spawnPoints.Length)], Quaternion.identity);
+			_players[i].GetComponent<PlayerBehaviour>().manager = new PlayerManager(_players[i], "CPU "+i.ToString(), _nextId++);
+			_players[i].GetComponent<AIBehaviour>().manager = _players[i].GetComponent<PlayerBehaviour>().manager;
+			_players[i].GetComponent<MeshRenderer>().material = playerMaterials[i+1];
 		}
 	}
-	
-	private void LateUpdate()
-	{
-		_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.StepTimers(Time.deltaTime);
-		//do respawn after one second
-		while(_toRespawn.Count > 0 &&
-				Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
-			_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);
-	}
-	
-	private void OnGUI()
-	{
-		if(_players.Length > 0)
-		{
-			for(int i=0; i<_players.Length; ++i)
-			{
-				PlayerManager p = _players[i].GetComponent<PlayerBehaviour>().manager;
-				string[] lbls = new string[5]{ p.Name, "Health", "Fuel", "Ammo",
-												"Kills/Deaths" };
-				string[] vals = new string[4] {
-					p.Stats.health.ToString() + "/" + p.Stats.maxHealth,
-					p.Stats.fuelRemaining.ToString() + "/" + p.Stats.maxFuel,
-					p.Stats.ammoRemaining.ToString() + "/" + p.Stats.maxAmmo,
-					p.Score.kills + "/" + p.Score.deaths };
-				
-				Rect lbl, data;
-				float w=100.0f, h=20.0f, hpad=1.0f;
-				float y = (i%2 == 0) ? 0.0f : Screen.height - 5.0f*(h+hpad);
-				float x = (i < 2) ? 0.0f : Screen.width - 200.0f;
-				lbl = new Rect(x, y, w, h);
-				data = new Rect(x + w, y+h+hpad, w, h);
-				
-				for(int j=0;j<5;++j)
-				{
-					GUI.Label(lbl, lbls[j]);
-					lbl.center = new Vector2(lbl.center.x, lbl.center.y + h + hpad);
-					
-					if(j==0)
-						continue;
-					
-					GUI.Label(data, vals[j-1]);
-					data.center = new Vector2(data.center.x, data.center.y + h + hpad);
-				}
-			}
-		}
-	}
-	
 	public void SpawnBullet(Vector3 pos, Vector3 velDir, int shooterId)
 	{
 		
@@ -203,4 +230,7 @@ public class GameManager : Singleton<GameManager>
 		
 		return null;
 	}
+	
+	public GameObject[] Players { get { return _players; } }
+	public GameState State { get { return _state; } }
 }

@@ -21,17 +21,17 @@ public class BulletManager : IObjectManager
 		ShooterId = shooterId;
 	}
 	
-	void IObjectManager.Disable()
+	public void Disable()
 	{
 		_bulletObj.SetActive(false);
 	}
 	
-	void IObjectManager.Enable()
+	public void Enable()
 	{
 		_bulletObj.SetActive(true);
 	}
 	
-	int IObjectManager.Id { get { return _id; } }
+	public int Id { get { return _id; } }
 	
 	public int ShooterId { get; set; }
 }

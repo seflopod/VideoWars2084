@@ -5,6 +5,7 @@ public class PlayerManager : IObjectManager
 {
 	public struct StateBools
 	{
+		public bool inGame;
 		public bool canJump;
 		public bool canShoot;
 		public bool canThrust;
@@ -16,6 +17,7 @@ public class PlayerManager : IObjectManager
 		
 		public void Reset()
 		{
+			inGame = false;
 			canJump = true;
 			canShoot = true;
 			canThrust = true;
@@ -27,6 +29,7 @@ public class PlayerManager : IObjectManager
 		}
 	};
 	
+	private GameObject _prefab;
 	private GameObject _playerObj;
 	private int _id;
 	//private int _state;
@@ -37,24 +40,38 @@ public class PlayerManager : IObjectManager
 	private float _thrustRegenTimer;
 	private StateBools _state;
 	private string _name;
-	
 	private Vector3 _moveDirection;
 	private Vector3 _fireDirection;
 	
-	public PlayerManager(GameObject playerObj, string name, int id)
+	public PlayerManager(GameObject prefab, string name, int id)
 	{
-		_playerObj = playerObj;
+		_prefab = prefab;
 		_name = name;
 		_id = id;
 		_state = new StateBools();
 		_state.Reset();
 		_stats = new PlayerStatsData();
 		_score = new PlayerScoreData();
-		_reloadTimer = 0.0f;
-		_fireTimer = 0.0f;
-		_thrustRegenTimer = 0.0f;
-		_moveDirection = Vector3.right;
-		_fireDirection = _moveDirection;
+		Credits = 0;
+	}
+	
+	public void JoinGame(Vector3 pos, Material mat)
+	{
+		if(!_state.inGame)
+		{
+			_playerObj = (GameObject)GameObject.Instantiate(_prefab, pos, Quaternion.identity);
+			_playerObj.GetComponent<MeshRenderer>().material = mat;
+			_playerObj.GetComponent<PlayerBehaviour>().manager = this;
+			AIBehaviour ai = _playerObj.GetComponent<AIBehaviour>();
+			if(ai != null)
+				ai.manager = this;
+			_reloadTimer = 0.0f;
+			_fireTimer = 0.0f;
+			_thrustRegenTimer = 0.0f;
+			_moveDirection = Vector3.right;
+			_fireDirection = _moveDirection;
+			_state.inGame = true;
+		}
 	}
 	
 	/// <summary>
@@ -266,17 +283,17 @@ public class PlayerManager : IObjectManager
 	
 	
 	#region IObject_implementation
-	void IObjectManager.Disable()
+	public void Disable()
 	{
 		_playerObj.SetActive(false);
 	}
 	
-	void IObjectManager.Enable()
+	public void Enable()
 	{
 		_playerObj.SetActive(true);
 	}
 	
-	int IObjectManager.Id { get { return _id; } }
+	public int Id { get { return _id; } }
 	#endregion
 	
 	#region properties
@@ -352,5 +369,6 @@ public class PlayerManager : IObjectManager
 	
 	public string Name { get { return _name; } }
 	public float TimeOfDeath { get; set; }
+	public int Credits { get; set; }
 	#endregion
 }
