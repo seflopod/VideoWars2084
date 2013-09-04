@@ -3,17 +3,23 @@ using System.Collections;
 
 public class PlayerBehaviour : MonoBehaviour
 {
-	public PlayerManager manager;
+	private PlayerManager manager;
 	
-	private void FixedUpdate()
+	protected virtual void FixedUpdate()
 	{
 		Vector3 vel = rigidbody.velocity;
 		manager.FireDirection = vel.normalized;
 	}
 	
-	private void OnCollisionEnter(Collision c)
+	protected virtual void OnCollisionEnter(Collision c)
 	{
 		if(c.gameObject.name == "Terrain")
 			manager.CanJump = true;
+	}
+	
+	public virtual PlayerManager Manager
+	{
+		get { return _manager; }
+		set { _manager = value; }
 	}
 }

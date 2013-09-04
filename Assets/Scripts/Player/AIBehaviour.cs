@@ -1,25 +1,34 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class AIBehaviour : MonoBehaviour
+public class AIBehaviour : PlayerBehaviour
 {
 	
-	public AIPlayerManager manager;
+	public AIPlayerManager _manager;
 	
 	private void Update()
 	{
-		manager.StepTimers(Time.deltaTime);
-		manager.Move();
+		_manager.StepTimers(Time.deltaTime);
+		_manager.Move();
 	}
 	
-	private void FixedUpdate()
+	protected override void FixedUpdate()
 	{
-		manager.Fire();
+		base.FixedUpdate();
+		_manager.Fire();
 	}
 	
-	private void OnCollisionEnter(Collision c)
+	protected override void OnCollisionEnter(Collision c)
 	{
-		if(c.collider.gameObject.CompareTag("terrain") && Random.Range(0,4) == 1)
-			manager.ForceDirectionChange();
+		base.OnCollisionEnter(c);
+		
+		if(c.collider.gameObject.name == "Terrain" && Random.Range(0,4) == 1)
+			_manager.ForceDirectionChange();
+	}
+	
+	public override PlayerManager Manager
+	{
+		get { return _manager; }
+		set { _manager = (AIPlayerManager)value; }
 	}
 }
