@@ -14,6 +14,8 @@ public class InputSetupData
 	public KeyCode button5;
 	public KeyCode button6;
 	public KeyCode button7;
+	public KeyCode coin;
+	public KeyCode start;
 	
 	public InputSetupData()
 	{
@@ -43,6 +45,8 @@ public class InputSetupData
 			button5 = KeyCode.K;
 			button6 = KeyCode.L;
 			button7 = KeyCode.Space;
+			coin = KeyCode.Backslash;
+			start = KeyCode.Return;
 			break;
 		case 2:
 			up = KeyCode.UpArrow;
@@ -56,6 +60,8 @@ public class InputSetupData
 			button5 = KeyCode.Keypad2;
 			button6 = KeyCode.Keypad3;
 			button7 = KeyCode.Keypad0;
+			coin = KeyCode.KeypadPlus;
+			start = KeyCode.KeypadEnter;
 			break;
 		default:
 			break;

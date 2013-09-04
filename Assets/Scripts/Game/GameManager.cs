@@ -18,7 +18,8 @@ public class GameManager : Singleton<GameManager>
 	
 	public int maxPlayers = 4;
 	
-	public Color playerColors;
+	public Color[] playerColors;
+	public Material basePlayerMaterial;
 	public GameObject playerPrefab;
 	public GameObject aiPrefab;
 	public GameObject terrainPrefab;
@@ -32,6 +33,7 @@ public class GameManager : Singleton<GameManager>
 	
 	private List<IObjectManager> _objects;
 	private PlayerManager[] _players;
+	private HumanPlayerManager[] _humans;
 	private int _localPlayer;
 	//private int _localPlayer;
 	private BulletManager[] _bullets;
@@ -40,6 +42,7 @@ public class GameManager : Singleton<GameManager>
 	private Vector3[] _spawnPoints;
 	private InputSetupData _player1Keys;
 	private InputSetupData _player2Keys;
+	private InputSetupData[] _playerKeys;
 	private GameState _state;
 	private GUIManager _gui;
 	
@@ -60,30 +63,103 @@ public class GameManager : Singleton<GameManager>
 	private void Start()
 	{
 		_gui = gameObject.GetComponent<GUIManager>();
+		_playerKeys = new InputSetupData[2];
+		_playerKeys[0] = new InputSetupData(1);
+		_playerKeys[1] = new InputSetupData(2);
+		_players = new AIPlayerManager[maxPlayers];
+		_humans = new HumanPlayerManager[2];
 	}
 	
 	private void Update()
 	{
-		if(_state.title)
+		TimedEventManager.IncrementTimers(Time.deltaTime);
+		for(int i=0;i<_players.Length;++i)
+			_players[i].StepTimers(Time.deltaTime);
+		ProcessCoinStartInput();
+		
+		if(_state.title || _state.demo)
 		{ 
-			if(!Application.loadedLevelName.Equals("title"))
-				Application.LoadLevel("title");
-			else
+		}
+		else
+		{
+			if(_state.player1Play)
+				ProcessMovementInput(0);
+			if(_state.player2Play)
+				ProcessMovementInput(1);
+			
+			if(_state.player1Play)
+				ProcessActionInput(0);
+			if(_state.player2Play)
+				ProcessActionInput(1);
+		}
+	}
+	
+	private void LateUpdate()
+	{
+		//do respawn after one second
+		while(_toRespawn.Count > 0 &&
+				Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
+			_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);
+	}
+	
+	private void OnLevelWasLoaded(int lvlIdx)
+	{
+		if(!Application.loadedLevelName.Equals("title"))
+			StartBoard();
+	}
+	
+	#region input_handling
+	private void ProcessCoinStartInput()
+	{
+		if(Input.GetKeyUp(_playerKeys[0].coin))
+			_humans[0].Credits++;
+		if(Input.GetKeyUp(_playerKeys[1].coin))
+			_humans[1].Credits++;
+		
+		bool start1 = false, start2 = false;
+		if(!_state.player1Play && Input.GetKeyUp(_playerKeys[0].start) && _humans[0].Credits >= 1)
+		{
+			_state.player1Play = true;
+			if(_state.player1InsertCoin)
 			{
-				
+				_state.player1InsertCoin = false;
+				start1 = true;
 			}
 		}
-		TimedEventManager.IncrementTimers(Time.deltaTime);
+		if(!_state.player2Play && Input.GetKeyUp(_playerKeys[1].start) && _humans[1].Credits >= 1)
+		{
+			_state.player2Play = true;
+			if(_state.player2InsertCoin)
+			{
+				_state.player2InsertCoin = false;
+				start2 = true;
+			}
+		}
 		
-		//check for player one movement
-		/*Vector3 moveDirection = Vector3.zero;
-		if(Input.GetKey(_player1Keys.up))
+		if((_state.demo || _state.title) && (_state.player1Play || _state.player2Play))
+		{
+			StartPlaying();
+		}
+		else if(start1)
+		{
+			HumanJoin(0);
+		}
+		else if(start2)
+		{
+			HumanJoin(1);
+		}
+	}
+	
+	private void ProcessMovementInput(int idx)
+	{
+		Vector3 moveDirection = Vector3.zero;
+		if(Input.GetKey(_playerKeys[idx].up))
 			moveDirection.y+=1;
-		if(Input.GetKey(_player1Keys.down))
+		if(Input.GetKey(_playerKeys[idx].down))
 			moveDirection.y-=1;
-		if(Input.GetKey(_player1Keys.left))
+		if(Input.GetKey(_playerKeys[idx].left))
 			moveDirection.x-=1;
-		if(Input.GetKey(_player1Keys.right))
+		if(Input.GetKey(_playerKeys[idx].right))
 			moveDirection.x+=1;
 		
 		//normalize if two keys hit
@@ -91,75 +167,77 @@ public class GameManager : Singleton<GameManager>
 			moveDirection = moveDirection.normalized;
 		
 		if(moveDirection != Vector3.zero)
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Move(moveDirection, Time.deltaTime);*/
+			_players[0].Move(moveDirection, Time.deltaTime);
 	}
 	
-	private void FixedUpdate()
+	private void ProcessActionInput(int idx)
 	{
-		/*if(Input.GetKey(_player1Keys.button6))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Jump();
+		if(Input.GetKey(_playerKeys[idx].button6))
+			_players[idx].Jump();
 		
-		if(Input.GetKey(_player1Keys.button5))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Thrust();
+		if(Input.GetKey(_playerKeys[idx].button5))
+			_players[idx].Thrust();
 		
-		if(Input.GetKeyUp(_player1Keys.button5))
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.EndThrust();
+		if(Input.GetKeyUp(_playerKeys[idx].button5))
+			_players[idx].EndThrust();
 		
-		if(Input.GetKeyDown(_player1Keys.button4))
-		{
-			Vector3 mousePos = Input.mousePosition;
-			Plane xy = new Plane(-Vector3.forward, Vector3.zero);
-			Ray ray = Camera.main.ScreenPointToRay(mousePos);
-			float dist;
-			
-			xy.Raycast(ray, out dist);
-			Vector3 mouseWorld = ray.GetPoint(dist);
-			
-			_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.Fire(mouseWorld);
-		}*/
+		if(Input.GetKeyDown(_playerKeys[idx].button4))
+			_players[idx].Fire();
 	}
-	
-	private void LateUpdate()
-	{
-		/*_players[_localPlayer].GetComponent<PlayerBehaviour>().manager.StepTimers(Time.deltaTime);
-		//do respawn after one second
-		while(_toRespawn.Count > 0 &&
-				Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
-			_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);*/
-	}
-	
+	#endregion
+	//Applies when transitioning to title screen
 	private void StartTitle()
 	{
 		
 	}
 	
-	private void StartGame()
+	//Applies when the game transitions from title/demo to humans playing
+	private void StartPlaying()
 	{
-		_objects = new List<IObjectManager>();
-		_players = new GameObject[maxPlayers];
+		for(int i=0;i<_humans.Length;++i)
+			if(_humans[i].Credits >= 1 && _players[i].Id != _humans[i].Id)
+				HumanJoin(i);
+		
+		_state.demo = false;
+		_state.title = false;
+		
+		//reset all scores
+		for(int i=0;i<_players.Length;++i)
+			_players[i].Score.Reset();
+		
+		//reload level to make sure game is reset with humans
+		Application.LoadLevel(1); //should be a playable level
+	}
+	
+	//Applies when showing the demo
+	private void StartDemo()
+	{
+		//remove any humans
+		for(int i=0;i<_humans.Length;++i)
+		{
+			if(_humans[i] == _players[i])
+			{
+				_humans[i].Kill();
+				_players[i] = new AIPlayerManager(aiPrefab, "some name", _nextId++);
+			}
+		}
+		
+		//populate with AIPlayers
+		AIJoin();
+	}
+	
+	//Applies to every time a playable level is started
+	private void StartBoard()
+	{
 		_toRespawn = new Queue<PlayerManager>();
 		
+		//find all spawn points and populate the spawn point array
 		GameObject[] spawns = GameObject.FindGameObjectsWithTag("spawn_point");
 		_spawnPoints = new Vector3[spawns.Length];
 		for(int i=0;i < spawns.Length;++i)
 			_spawnPoints[i] = spawns[i].transform.position;
-			
-		//make local player
-		_players[0] = (GameObject)GameObject.Instantiate(playerPrefab, _spawnPoints[Random.Range(0,_spawnPoints.Length)], Quaternion.identity);
-		Camera.main.GetComponent<CameraFollow>().target = _players[0].transform;
-		_players[0].GetComponent<PlayerBehaviour>().manager = new PlayerManager(_players[0], "Player", _nextId++);
-		_players[0].GetComponent<MeshRenderer>().material = playerMaterials[0];
-		_localPlayer = 0;	
 		
-		//add other players
-		for(int i=1;i<maxPlayers;++i)
-		{
-			_players[i] = (GameObject)GameObject.Instantiate(aiPrefab, _spawnPoints[Random.Range(0,_spawnPoints.Length)], Quaternion.identity);
-			_players[i].GetComponent<PlayerBehaviour>().manager = new PlayerManager(_players[i], "CPU "+i.ToString(), _nextId++);
-			_players[i].GetComponent<AIBehaviour>().manager = _players[i].GetComponent<PlayerBehaviour>().manager;
-			_players[i].GetComponent<MeshRenderer>().material = playerMaterials[i+1];
-		}
-		
+		//create and spawn all bullets
 		GameObject go = new GameObject("BulletContainer");
 		go.transform.position = Vector3.zero;
 		
@@ -171,31 +249,52 @@ public class GameManager : Singleton<GameManager>
 			b.transform.parent = go.transform;
 			_bullets[i] = new BulletManager(b, _nextId++);
 			b.GetComponent<BulletBehaviour>().manager = _bullets[i];
-			((IObjectManager)_bullets[i]).Disable();
-			//b.SetActive(false);
+			_bullets[i].Disable();
 		}
 		_bulletIdx = 0;
 		
-		_player1Keys = new InputSetupData(1);
-		_player2Keys = new InputSetupData(2);
+		//add all players to the board
+		for(int i=0;i<_players.Length;++i)
+		{
+			Material mat = new Material(basePlayerMaterial);
+			mat.color = playerColors[i];
+			_players[i].JoinGame(_spawnPoints[Random.Range(0,_spawnPoints.Length)], mat);
+		}
 	}
 	
 	private void CreatePlayers()
 	{
-		
+		_humans = new HumanPlayerManager[2];
+		_humans[0] = new HumanPlayerManager(playerPrefab, "some name", _nextId++);
+		_humans[1] = new HumanPlayerManager(playerPrefab, "some name", _nextId++);
 		for(int i=0; i < maxPlayers; ++i)
 		{
-			if(i <= 1)
-				_players[i] = new PlayerManager(playerPrefab, "some name", _nextId++);
-			else
-				_players[i] = new PlayerManager(aiPrefab, "some name", _nextId++);
-			
-			_players[i] = (GameObject)GameObject.Instantiate(aiPrefab, _spawnPoints[Random.Range(0,_spawnPoints.Length)], Quaternion.identity);
-			_players[i].GetComponent<PlayerBehaviour>().manager = new PlayerManager(_players[i], "CPU "+i.ToString(), _nextId++);
-			_players[i].GetComponent<AIBehaviour>().manager = _players[i].GetComponent<PlayerBehaviour>().manager;
-			_players[i].GetComponent<MeshRenderer>().material = playerMaterials[i+1];
+			_players[i] = new AIPlayerManager(aiPrefab, "some name", _nextId++);
 		}
 	}
+	
+	private void HumanJoin(int idx)
+	{
+		_players[idx].Kill();
+		Material mat = new Material(basePlayerMaterial);
+		mat.color = playerColors[idx];
+		_humans[idx].JoinGame(_spawnPoints[Random.Range(0,_spawnPoints.Length)], mat);
+		_players[idx] = _humans[idx];
+	}
+	
+	private void AIJoin()
+	{
+		for(int i=0; i< maxPlayers; ++i)
+		{
+			if(((AIPlayerManager)_players[i]) != null)
+			{
+				Material mat = new Material(basePlayerMaterial);
+				mat.color = playerColors[i];
+				_players[i].JoinGame(_spawnPoints[Random.Range(0,_spawnPoints.Length)], mat);
+			}
+		}
+	}
+	
 	public void SpawnBullet(Vector3 pos, Vector3 velDir, int shooterId)
 	{
 		
@@ -208,8 +307,15 @@ public class GameManager : Singleton<GameManager>
 	{
 		_toRespawn.Enqueue(pm);
 		//play sound for death
-		int d_id = ((IObjectManager)pm).Id;
-		Vector3 d_pos = _players[d_id-1].transform.position;
+		int d_id = pm.Id;
+		Vector3 d_pos = Vector3.zero;
+		for(int i=0;i<_players.Length;++i)
+		{
+			if(_players[i].Id == d_id)
+			{
+				d_pos = _players[i].PlayerObject.transform.position;
+			}
+		}
 		GameObject ds = (GameObject)GameObject.Instantiate(deathSoundPrefab, d_pos, Quaternion.identity);
 		ds.audio.clip = GetClip("death");
 		ds.audio.Play();
@@ -218,8 +324,17 @@ public class GameManager : Singleton<GameManager>
 		GameObject.Destroy(ds, 2 * ds.audio.clip.length);
 		
 		//this can't work for long, find a better way
-		if(killerId != ((IObjectManager)pm).Id) //don't want suicide to count
-			_players[killerId - 1].GetComponent<PlayerBehaviour>().manager.Score.kills++;
+		if(killerId != d_id) //don't want suicide to count
+		{
+			for(int i=0;i<_players.Length;++i)
+			{
+				if(_players[i].Id == killerId)
+				{
+					_players[i].Score.kills++;
+					break;
+				}
+			}
+		}
 	}
 	
 	public AudioClip GetClip(string name)
@@ -231,6 +346,6 @@ public class GameManager : Singleton<GameManager>
 		return null;
 	}
 	
-	public GameObject[] Players { get { return _players; } }
+	public PlayerManager[] Players { get { return _players; } }
 	public GameState State { get { return _state; } }
 }

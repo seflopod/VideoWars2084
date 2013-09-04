@@ -34,7 +34,7 @@ public class GUIManager : MonoBehaviour
 	
 	private void ShowAllPlayerInfo()
 	{
-		if(GameManager.Instance.Players.Length > 0)
+		/*if(GameManager.Instance.Players.Length > 0)
 		{
 			for(int i=0; i<GameManager.Instance.Players.Length; ++i)
 			{
@@ -66,6 +66,6 @@ public class GUIManager : MonoBehaviour
 					data.center = new Vector2(data.center.x, data.center.y + h + hpad);
 				}
 			}
-		}
+		}*/
 	}
 }
