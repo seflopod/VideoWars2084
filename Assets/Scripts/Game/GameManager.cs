@@ -16,17 +16,17 @@ public class GameManager : Singleton<GameManager>
 	
 	private static int _nextId = 1;
 	
-	public int maxPlayers = 4;
-	
-	public Color[] playerColors;
+	public int maxPlayers = 8;	
 	public Material basePlayerMaterial;
+	public Material baseBulletMaterial;
+	public Color[] playerColors;
+	
+	public GameObject mainCameraPrefab;
 	public GameObject playerPrefab;
 	public GameObject aiPrefab;
-	public GameObject terrainPrefab;
 	public GameObject bulletPrefab;
 	public GameObject deathSoundPrefab;
-	public Material[] playerMaterials;
-	public Material[] bulletMaterials;
+	
 	public Texture2D[] healthTextures;
 	public SoundsMap[] sounds;
 	
@@ -34,8 +34,6 @@ public class GameManager : Singleton<GameManager>
 	private List<IObjectManager> _objects;
 	private PlayerManager[] _players;
 	private HumanPlayerManager[] _humans;
-	private int _localPlayer;
-	//private int _localPlayer;
 	private BulletManager[] _bullets;
 	private int _bulletIdx;
 	private Queue<PlayerManager> _toRespawn;
@@ -45,6 +43,7 @@ public class GameManager : Singleton<GameManager>
 	private InputSetupData[] _playerKeys;
 	private GameState _state;
 	private GUIManager _gui;
+	private Camera _cam;
 	
 	protected override void Awake()
 	{
@@ -68,17 +67,26 @@ public class GameManager : Singleton<GameManager>
 		_playerKeys[1] = new InputSetupData(2);
 		_players = new AIPlayerManager[maxPlayers];
 		_humans = new HumanPlayerManager[2];
+		CreatePlayers();
+		
+		//get ready for title screen loading
+		TimedEventManager.AddEvent("switchDemoTitle", 30.0f);
+		TimedEventManager.Register("switchDemoTitle", OnDemoTitleSwitch);
+		StartTitle();
 	}
 	
 	private void Update()
 	{
 		TimedEventManager.IncrementTimers(Time.deltaTime);
-		for(int i=0;i<_players.Length;++i)
-			_players[i].StepTimers(Time.deltaTime);
+		
+		if(!_state.title && !_state.gameOver)
+			for(int i=0;i<_players.Length;++i)
+				_players[i].StepTimers(Time.deltaTime);
+		
 		ProcessCoinStartInput();
 		
 		if(_state.title || _state.demo)
-		{ 
+		{
 		}
 		else
 		{
@@ -96,16 +104,20 @@ public class GameManager : Singleton<GameManager>
 	
 	private void LateUpdate()
 	{
-		//do respawn after one second
-		while(_toRespawn.Count > 0 &&
-				Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
-			_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);
+		if(!_state.title && !_state.gameOver)
+		{
+			//do respawn after one second
+			while(_toRespawn.Count > 0 &&
+					Time.time - _toRespawn.Peek().TimeOfDeath >= 1.0f)
+					_toRespawn.Dequeue().ReSpawn(_spawnPoints[Random.Range(0,_spawnPoints.Length)]);
+		}
 	}
 	
 	private void OnLevelWasLoaded(int lvlIdx)
 	{
-		if(!Application.loadedLevelName.Equals("title"))
-			StartBoard();
+		_toRespawn = new Queue<PlayerManager>();
+		if(_state.demo)
+			StartDemo();
 	}
 	
 	#region input_handling
@@ -188,7 +200,7 @@ public class GameManager : Singleton<GameManager>
 	//Applies when transitioning to title screen
 	private void StartTitle()
 	{
-		
+		Application.LoadLevel("title");
 	}
 	
 	//Applies when the game transitions from title/demo to humans playing
@@ -206,7 +218,7 @@ public class GameManager : Singleton<GameManager>
 			_players[i].Score.Reset();
 		
 		//reload level to make sure game is reset with humans
-		Application.LoadLevel(1); //should be a playable level
+		Application.LoadLevel(2); //should be a playable level
 	}
 	
 	//Applies when showing the demo
@@ -215,15 +227,15 @@ public class GameManager : Singleton<GameManager>
 		//remove any humans
 		for(int i=0;i<_humans.Length;++i)
 		{
-			if(_humans[i] == _players[i])
+			if(_humans[i].Id == _players[i].Id)
 			{
 				_humans[i].Kill();
 				_players[i] = new AIPlayerManager(aiPrefab, "some name", _nextId++);
 			}
 		}
-		
+		StartBoard();
 		//populate with AIPlayers
-		AIJoin();
+		//AIJoin();
 	}
 	
 	//Applies to every time a playable level is started
@@ -258,8 +270,28 @@ public class GameManager : Singleton<GameManager>
 		{
 			Material mat = new Material(basePlayerMaterial);
 			mat.color = playerColors[i];
+			
 			_players[i].JoinGame(_spawnPoints[Random.Range(0,_spawnPoints.Length)], mat);
 		}
+		
+		_cam = ((GameObject)GameObject.Instantiate(mainCameraPrefab, Vector3.zero, Quaternion.identity)).GetComponent<Camera>();
+		
+		if(_state.demo)
+		{
+			int idx = Random.Range(0, _players.Length);
+			_cam.gameObject.GetComponent<CameraFollow>().target = _players[idx].PlayerObject.transform;
+		}
+	}
+	
+	public void OnDemoTitleSwitch(float timerVal)
+	{
+		_state.demo = !_state.demo;
+		_state.title = !_state.title;
+		
+		if(_state.title)
+			StartTitle();
+		else
+			Application.LoadLevel(2); //must be a playable level
 	}
 	
 	private void CreatePlayers()
@@ -300,7 +332,9 @@ public class GameManager : Singleton<GameManager>
 		
 		if(_bulletIdx >= 100) //just to limit the number of times we need to use mod
 			_bulletIdx%=100;
-		_bullets[_bulletIdx++].Spawn(pos, velDir, shooterId, bulletMaterials[shooterId]);
+		Material mat = new Material(baseBulletMaterial);
+		mat.color = playerColors[GetPlayerIndex(shooterId)];
+		_bullets[_bulletIdx++].Spawn(pos, velDir, shooterId, mat);
 	}
 	
 	public void PlayerDied(PlayerManager pm, int killerId)
@@ -344,6 +378,15 @@ public class GameManager : Singleton<GameManager>
 				return sm.sound;
 		
 		return null;
+	}
+	
+	public int GetPlayerIndex(int id)
+	{
+		for(int i=0;i<_players.Length;++i)
+			if(_players[i].Id == id)
+				return i;
+		
+		return -1;
 	}
 	
 	public PlayerManager[] Players { get { return _players; } }

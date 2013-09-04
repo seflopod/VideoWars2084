@@ -1,9 +1,8 @@
-﻿using UnityEngine;
-using System.Collections;
+using UnityEngine;
 
-public class PlayerBehaviour : MonoBehaviour
+public class HumanPlayerBehaviour : MonoBehaviour
 {
-	protected PlayerManager _manager;
+	protected HumanPlayerManager _manager;
 	
 	protected virtual void FixedUpdate()
 	{
@@ -20,6 +19,6 @@ public class PlayerBehaviour : MonoBehaviour
 	public virtual PlayerManager Manager
 	{
 		get { return _manager; }
-		set { _manager = value; }
+		set { _manager = (HumanPlayerManager)value; }
 	}
 }

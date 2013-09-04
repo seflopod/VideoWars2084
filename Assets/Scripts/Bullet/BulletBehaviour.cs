@@ -16,7 +16,7 @@ public class BulletBehaviour : MonoBehaviour {
 		PlayerBehaviour pb = c.gameObject.GetComponent<PlayerBehaviour>();
 		if(pb != null)
 		{
-			pb.manager.TakeDamage(Mathf.FloorToInt(rigidbody.velocity.sqrMagnitude / 8), manager.ShooterId);
+			pb.Manager.TakeDamage(Mathf.FloorToInt(rigidbody.velocity.sqrMagnitude / 8), manager.ShooterId);
 			gameObject.SetActive(false);
 		}
 	}

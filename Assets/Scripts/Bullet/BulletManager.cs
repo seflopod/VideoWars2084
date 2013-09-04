@@ -15,7 +15,7 @@ public class BulletManager : IObjectManager
 	public void Spawn(Vector3 pos, Vector3 velDir, int shooterId, Material mat)
 	{
 		_bulletObj.transform.position = pos;
-		_bulletObj.rigidbody.velocity = velDir * 50.0f;
+		_bulletObj.rigidbody.velocity = velDir * 40.0f;
 		_bulletObj.SetActive(true);
 		_bulletObj.GetComponent<MeshRenderer>().material = mat;
 		ShooterId = shooterId;

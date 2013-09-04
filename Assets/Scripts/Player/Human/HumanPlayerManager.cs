@@ -22,7 +22,7 @@ public class HumanPlayerManager : PlayerManager
 			_playerObj = (GameObject)GameObject.Instantiate(_prefab, pos,
 														Quaternion.identity);
 			_playerObj.GetComponent<MeshRenderer>().material = mat;
-			_playerObj.GetComponent<PlayerBehaviour>().manager = this;
+			_playerObj.GetComponent<PlayerBehaviour>().Manager = this;
 			_reloadTimer = 0.0f;
 			_fireTimer = 0.0f;
 			_thrustRegenTimer = 0.0f;

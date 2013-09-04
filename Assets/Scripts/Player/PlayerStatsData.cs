@@ -8,7 +8,7 @@ public class PlayerStatsData
 	public int maxFuel = 3000;
 	public int ammoRemaining = 50;
 	public int maxAmmo = 50;
-	public float rateOfFire = 0.025f;
+	public float rateOfFire = 0.1f;
 	public float reloadTime = 1.5f;
 	public float jumpSpeed = 20.0f;
 	public float moveSpeed = 30.0f;

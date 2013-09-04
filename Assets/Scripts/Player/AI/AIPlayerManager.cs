@@ -30,8 +30,7 @@ public class AIPlayerManager : PlayerManager
 			_playerObj = (GameObject)GameObject.Instantiate(_prefab, pos,
 														Quaternion.identity);
 			_playerObj.GetComponent<MeshRenderer>().material = mat;
-			_playerObj.GetComponent<PlayerBehaviour>().manager = this;
-			_playerObj.GetComponent<AIBehaviour>().manager = this;
+			_playerObj.GetComponent<AIBehaviour>().Manager = this;
 			_reloadTimer = 0.0f;
 			_fireTimer = 0.0f;
 			_thrustRegenTimer = 0.0f;
@@ -103,7 +102,7 @@ public class AIPlayerManager : PlayerManager
 		//see if we our current target is still available
 		foreach(GameObject target in targets)
 		{
-			if(target.GetComponent<PlayerBehaviour>().manager.Id ==
+			if(target.GetComponent<PlayerBehaviour>().Manager.Id ==
 																_curTarget)
 				return target.transform.position;
 		}
@@ -117,7 +116,7 @@ public class AIPlayerManager : PlayerManager
 		{
 			int idx = Random.Range(0,targets.Count);
 			_curTarget =
-					targets[idx].GetComponent<PlayerBehaviour>().manager.Id;
+					targets[idx].GetComponent<PlayerBehaviour>().Manager.Id;
 			return targets[idx].transform.position;
 		}
 	}
