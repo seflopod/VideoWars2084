@@ -11,7 +11,7 @@ public class GUIManager : MonoBehaviour
 	
 	private void OnGUI()
 	{
-		if(GameManager.Instance.State.title)
+		if(GameManagerBehaviour.Instance.State == GameManagerBehaviour.GameState.NotPlaying)
 			DisplayTitle();
 	}
 	

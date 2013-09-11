@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
-using System.Collections.Generic;
 
-public abstract class PlayerManager : IObjectManager
+public class PlayerManager : IObjectManager
 {
 	public struct StateBools
 	{
@@ -29,25 +28,89 @@ public abstract class PlayerManager : IObjectManager
 		}
 	};
 	
-	protected GameObject _prefab;
-	protected GameObject _playerObj;
-	protected int _id;
-	protected PlayerStatsData _stats;
-	protected PlayerScoreData _score;
-	protected float _reloadTimer;
-	protected float _fireTimer;
-	protected float _thrustRegenTimer;
-	protected StateBools _state;
-	protected string _name;
-	protected Vector3 _moveDirection;
-	protected Vector3 _fireDirection;
+	private GameObject _prefab;
+	private GameObject _playerObj;
+	private int _id;
+	private PlayerStatsData _stats;
+	private PlayerScoreData _score;
+	private float _reloadTimer;
+	private float _fireTimer;
+	private float _thrustRegenTimer;
+	private StateBools _state;
+	private string _name;
+	private Vector3 _moveDirection;
+	private Vector3 _fireDirection;
+	private bool _isHuman;
+	private Material _mat;
 	
-	public abstract void JoinGame(Vector3 pos, Material mat);
+	public PlayerManager(GameObject prefab, string name, int id, Material mat)
+	{
+		_prefab = prefab;
+		_name = name;
+		_id = id;
+		_mat = mat;
+		
+		_state = new StateBools();
+		_state.Reset();
+		_stats = new PlayerStatsData();
+		_score = new PlayerScoreData();
+		Credits = 0;
+	}
 	
+	public void SpawnInStage(Vector3 pos)
+	{
+		if(!_state.inGame)
+		{
+			_playerObj = (GameObject)GameObject.Instantiate(_prefab, pos,
+														Quaternion.identity);
+			_playerObj.GetComponent<MeshRenderer>().material = _mat;
+			_playerObj.GetComponent<PlayerBehaviour>().Manager = this;
+			_reloadTimer = 0.0f;
+			_fireTimer = 0.0f;
+			_thrustRegenTimer = 0.0f;
+			_moveDirection = Vector3.right;
+			_fireDirection = _moveDirection;
+			_state.inGame = true;
+		}
+	}
+	
+	#region movement
+	public void Move(Vector3 dir, float dt)
+	{
+		if(dir == _moveDirection)
+			return;
+		
+		_moveDirection = dir;
+		
+		Vector3 velNorm = _playerObj.rigidbody.velocity.normalized;
+		_moveDirection = (velNorm + dir).normalized;
+		_fireDirection = _moveDirection;
+		float curSpeedSq = _playerObj.rigidbody.velocity.sqrMagnitude;
+		if(velNorm != _moveDirection || curSpeedSq < _stats.moveSpeed * _stats.moveSpeed)
+		{
+			_playerObj.rigidbody.velocity = _playerObj.rigidbody.velocity + _moveDirection * _stats.moveSpeed;
+			if(_playerObj.rigidbody.velocity.sqrMagnitude > _stats.moveSpeed*_stats.moveSpeed)
+				_playerObj.rigidbody.velocity = _moveDirection * _stats.moveSpeed;
+		}
+	}
+	
+	public void Stop()
+	{
+		Vector3 vel = _playerObj.rigidbody.velocity;
+		vel.x *= 0.4f;
+		
+		//if the player is moving up the reduction is less than if they are
+		//moving down.
+		vel.y = (vel.y > 0.0f) ? vel.y*0.8f : vel.y*1.001f;
+		_playerObj.rigidbody.velocity = vel;
+	}
+	#endregion
+	
+	#region actions
 	/// <summary>
 	/// Fires a bullet in direction the player is currently moving.
 	/// </summary>
-	public virtual void Fire()
+	public void Fire()
 	{
 		if(_state.canShoot)
 		{
@@ -67,8 +130,9 @@ public abstract class PlayerManager : IObjectManager
 			}
 			
 			//tell the game to spawn the bullet at the proper position
-			GameManager.Instance.SpawnBullet(pos, _fireDirection, _id);
+			GameManagerBehaviour.Instance.SpawnBullet(pos, _fireDirection, _id);
 			
+			_score.bulletsFired++;
 			_stats.ammoRemaining--;
 			
 			//check to see if we need to reload or just put firing on cooldown
@@ -87,47 +151,12 @@ public abstract class PlayerManager : IObjectManager
 			_state.canShoot = false;
 			
 			//play audio
-			_playerObj.audio.clip = GameManager.Instance.GetClip("fire");
+			_playerObj.audio.clip = GameManagerBehaviour.Instance.Sounds["fire"];
 			_playerObj.audio.Play();
 		}
 	}
-	
-	public virtual void Move(Vector3 dir, float dt)
-	{
-		if(dir == _moveDirection)
-			return;
 		
-		_moveDirection = dir;
-		
-		Vector3 velNorm = _playerObj.rigidbody.velocity.normalized;
-		_moveDirection = (velNorm + dir).normalized;
-		_fireDirection = _moveDirection;
-		float curSpeedSq = _playerObj.rigidbody.velocity.sqrMagnitude;
-		if(velNorm != _moveDirection || curSpeedSq < _stats.moveSpeed * _stats.moveSpeed)
-		{
-			_playerObj.rigidbody.velocity = _playerObj.rigidbody.velocity + _moveDirection * _stats.moveSpeed;
-			if(_playerObj.rigidbody.velocity.sqrMagnitude > _stats.moveSpeed*_stats.moveSpeed)
-				_playerObj.rigidbody.velocity = _moveDirection * _stats.moveSpeed;
-		}
-	}
-	
-	/// <summary>
-	/// Makes the player jump.
-	/// </summary>
-	public virtual void Jump()
-	{
-		if(_state.canJump)
-		{
-			Vector3 vel = _playerObj.rigidbody.velocity;
-			vel.y += _stats.jumpSpeed;
-			_playerObj.rigidbody.velocity = vel;
-			_state.canJump = false;
-			
-			_playerObj.audio.clip = GameManager.Instance.GetClip("jump");
-		}
-	}
-	
-	public virtual void Thrust()
+	public void Thrust()
 	{
 		if(_state.canThrust)
 		{
@@ -150,23 +179,14 @@ public abstract class PlayerManager : IObjectManager
 		}
 	}
 	
-	public virtual void EndThrust()
+	public void EndThrust()
 	{
 		_state.thrusting = false;
 		if(!_state.fullThrustRegen)
 			_thrustRegenTimer = 0.0f;
 	}
+	#endregion
 	
-	public virtual void Stop()
-	{
-		Vector3 vel = _playerObj.rigidbody.velocity;
-		vel.x *= 0.4f;
-		
-		//if the player is moving up the reduction is less than if they are
-		//moving down.
-		vel.y = (vel.y > 0.0f) ? vel.y*0.8f : vel.y*1.001f;
-		_playerObj.rigidbody.velocity = vel;
-	}
 	
 	public void TakeDamage(int dmg, int shooterId)
 	{
@@ -177,31 +197,31 @@ public abstract class PlayerManager : IObjectManager
 		if(hPct > 0.8f)
 		{
 			_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[0];
+										GameManagerBehaviour.Instance.healthTextures[0];
 		}
 		else if(hPct <= 0.8f && hPct > 0.6f)
 		{
 			_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[1];
+										GameManagerBehaviour.Instance.healthTextures[1];
 		}
 		else if(hPct <= 0.6f && hPct > 0.4f)
 		{
 			_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[2];
+										GameManagerBehaviour.Instance.healthTextures[2];
 		}
 		else if(hPct <= 0.4f && hPct > 0.2f)
 		{
 			_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[3];
+										GameManagerBehaviour.Instance.healthTextures[3];
 		}
 		else
 		{
 			_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[4];
+										GameManagerBehaviour.Instance.healthTextures[4];
 		}
 		
 		//play sound for damage
-		_playerObj.audio.clip = GameManager.Instance.GetClip("damage");
+		_playerObj.audio.clip = GameManagerBehaviour.Instance.Sounds["damage"];
 		_playerObj.audio.Play();
 		
 		if(_stats.health <= 0)
@@ -210,7 +230,7 @@ public abstract class PlayerManager : IObjectManager
 			++_score.deaths;
 			_stats.health = 0;
 			TimeOfDeath = Time.time;
-			GameManager.Instance.PlayerDied(this, shooterId);
+			GameManagerBehaviour.Instance.PlayerDied(this, shooterId);
 			_playerObj.rigidbody.velocity = Vector3.zero;
 			_playerObj.audio.Stop();
 			_playerObj.SetActive(false);
@@ -273,13 +293,15 @@ public abstract class PlayerManager : IObjectManager
 		_playerObj.transform.position = spawnPosition;
 		_playerObj.rigidbody.isKinematic = false;
 		_playerObj.GetComponent<MeshRenderer>().material.mainTexture =
-										GameManager.Instance.healthTextures[0];
+										GameManagerBehaviour.Instance.healthTextures[0];
 	}
 	
 	public void Kill()
 	{
+		_state.inGame = false;
 		GameObject.DestroyImmediate(_playerObj);
 	}
+	
 	#region IObject_implementation
 	public void Disable()
 	{
@@ -294,17 +316,42 @@ public abstract class PlayerManager : IObjectManager
 	public int Id { get { return _id; } }
 	#endregion
 	
-	#region properties
-	public PlayerStatsData Stats
-	{
-		get { return _stats; }
-		set { _stats = value; }
-	}
-	
-	public PlayerScoreData Score
+	#region score_properties
+	public PlayerScoreData ScoreData
 	{
 		get { return _score; }
 		set { _score = value; }
+	}
+	
+	public int Kills
+	{
+		get { return _score.kills; }
+		set { _score.kills = value; }
+	}
+	
+	public int Deaths
+	{
+		get { return _score.deaths; }
+		set { _score.deaths = value; }
+	}
+	
+	public int Score
+	{
+		get
+		{
+			int s = Mathf.FloorToInt(31250.0f * _score.kills *
+							_score.bulletsHit/_score.bulletsFired - 3125 *
+							_score.deaths);
+			return (s < 0) ? 0 : s;
+		}
+	}
+	#endregion
+	
+	#region state_properties
+	public StateBools State
+	{
+		get { return _state; }
+		set { _state = value; }
 	}
 	
 	public bool CanShoot
@@ -354,6 +401,19 @@ public abstract class PlayerManager : IObjectManager
 		set { _state.dead = value; }
 	}
 	
+	public bool InGame
+	{
+		get { return _state.inGame; }
+		set { _state.inGame = value; }
+	}
+	#endregion
+	
+	public PlayerStatsData Stats
+	{
+		get { return _stats; }
+		set { _stats = value; }
+	}
+	
 	public Vector3 FireDirection
 	{
 		get { return _fireDirection; }
@@ -365,12 +425,24 @@ public abstract class PlayerManager : IObjectManager
 		get { return _moveDirection; }
 	}
 	
-	public string Name { get { return _name; } }
+	public string Name
+	{
+		get { return _name; }
+		set { _name = value; }
+	}
+	
 	public float TimeOfDeath { get; set; }
 	
 	public GameObject PlayerObject
 	{
 		get { return _playerObj; }
 	}
-	#endregion
+	
+	public bool IsHuman
+	{
+		get { return _isHuman; }
+		set { _isHuman = value; }
+	}
+	
+	public int Credits { get; set; }
 }
